@@ -1,13 +1,8 @@
 package com.nowcoder.controller;
 
 
-import com.nowcoder.model.Comment;
-import com.nowcoder.model.HostHolder;
-import com.nowcoder.model.News;
-import com.nowcoder.service.CommentService;
-import com.nowcoder.service.NewsService;
-import com.nowcoder.service.QiniuService;
-import com.nowcoder.service.UserService;
+import com.nowcoder.model.*;
+import com.nowcoder.service.*;
 import com.nowcoder.util.ToutiaoUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,7 +17,9 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 
 /*
@@ -47,36 +44,55 @@ public class NewsController {
     @Autowired
     CommentService commentService;
 
+    @Autowired
+    LikeService likeService;
+
     @RequestMapping(path = {"/addComment"}, method = {RequestMethod.POST})
     public String addComment(@RequestParam("newsId") int newsId,
                              @RequestParam("content") String content) {
-        try{
+        try {
             //过滤content
             Comment comment = new Comment();
             comment.setUserId(hostHolder.getUser().getId());
             comment.setContent(content);
-
+            comment.setEntityId(newsId);
+            comment.setEntityType(EntityType.ENTITY_NEWS);
+            comment.setCreatedDate(new Date());
+            comment.setStatus(0);
+            commentService.addComment(comment);
             //更新news的评论数量
-            int  count = commentService.getCommentCount(comment.getEntityId(), comment.getEntityType());
+            int count = commentService.getCommentCount(comment.getEntityId(), comment.getEntityType());
             newsService.updateCommentCount(comment.getEntityId(), count);
-        }catch (Exception e) {
-
+        } catch (Exception e) {
+            logger.error("增加评论失败" + e.getMessage());
         }
-        return "";
+        return "redirect:/news/" + String.valueOf(newsId);
     }
 
     @RequestMapping(path = {"/news/{newsId}"}, method = {RequestMethod.GET})
     public String newsDetail(@PathVariable("newsId") int newsId, Model model) {
-        try {
-            News news = newsService.getById(newsId);
-            if (news != null) {
-                //评论
+        News news = newsService.getById(newsId);
+        if (news != null) {
+            int localUserId = hostHolder.getUser() != null ? hostHolder.getUser().getId() : 0;
+            if(localUserId != 0) {
+                model.addAttribute("like", likeService.getLikeStatus(localUserId, EntityType.ENTITY_NEWS, news.getId()));
+            } else {
+                model.addAttribute("like", 0);
             }
-            model.addAttribute("news", news);
-            model.addAttribute("owner", userService.getUser(news.getUserId()));
-        } catch (Exception e) {
-
+            //评论
+            List<Comment> comments = commentService.getCommentsByEntity(news.getId(), EntityType.ENTITY_NEWS);
+            List<ViewObject> commentVOs = new ArrayList<ViewObject>();
+            for (Comment comment : comments) {
+                ViewObject vo = new ViewObject();
+                vo.set("comment", comment);
+                vo.set("user", userService.getUser(comment.getUserId()));
+                commentVOs.add(vo);
+            }
+            model.addAttribute("comments", commentVOs);
         }
+        model.addAttribute("news", news);
+        model.addAttribute("owner", userService.getUser(news.getUserId()));
+
         return "detail";
     }
 
@@ -86,6 +102,7 @@ public class NewsController {
                          HttpServletResponse response) {
         response.setContentType("image/jpeg");
         try {
+            response.setContentType("image/jpeg");
             StreamUtils.copy(new FileInputStream(
                     new File(ToutiaoUtil.IMAGE_DIR + imageName)), response.getOutputStream());
         } catch (IOException e) {
@@ -94,7 +111,7 @@ public class NewsController {
     }
 
 
-    @RequestMapping(path = {"/user/addNews/"}, method = {RequestMethod.POST, RequestMethod.GET})
+    @RequestMapping(path = {"/user/addNews/"}, method = {RequestMethod.POST})
     @ResponseBody
     public String addNews(@RequestParam("image") String image,
                           @RequestParam("title") String title,
@@ -123,8 +140,8 @@ public class NewsController {
     @ResponseBody
     public String uploadImage(@RequestParam("file") MultipartFile file) {
         try {
-            //String fileUrl = newsService.saveImage(file);
-            String fileUrl = qiniuService.saveImage(file);
+            String fileUrl = newsService.saveImage(file);
+            //String fileUrl = qiniuService.saveImage(file);
             if (fileUrl == null) {
                 return ToutiaoUtil.getJSONString(1, "图片上传失败！");
             }

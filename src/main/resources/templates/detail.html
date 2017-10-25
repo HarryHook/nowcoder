@@ -4,9 +4,17 @@
         <div class="post detail">
 
             <div class="votebar">
-                <button class="click-like up" aria-pressed="false" title="赞同"><i class="vote-arrow"></i><span class="count">$!{news.likeCount}</span></button>
-                <button class="click-dislike down" aria-pressed="true" title="反对"><i class="vote-arrow"></i>
-                </button>
+                #if($like > 0)
+                <button class="click-like up pressed" data-id="$!{news.id}" title="赞同"><i class="vote-arrow"></i><span class="count">$!{news.likeCount}</span></button>
+                #else
+                <button class="click-like up" data-id="$!{news.id}" title="赞同"><i class="vote-arrow"></i><span class="count">$!{news.likeCount}</span></button>
+                #end
+                #if($like < 0)
+                <button class="click-dislike down pressed" data-id="$!{news.id}" title="反对"><i class="vote-arrow"></i></button>
+                #else
+                <button class="click-dislike down" data-id="$!{news.id}" title="反对"><i class="vote-arrow"></i></button>
+                #end
+
             </div>
 
             <div class="content" data-url="http://nowcoder.com/posts/5l3hjr">
@@ -20,8 +28,8 @@
                     <div class="meta">
                         $!{news.link}
                         <span>
-                                  <i class="fa icon-comment"></i> $!{news.commentCount}
-                              </span>
+                            <i class="fa icon-comment"></i> $!{news.commentCount}
+                        </span>
                     </div>
                 </div>
             </div>
